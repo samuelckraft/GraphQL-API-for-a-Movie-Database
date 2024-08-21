@@ -14,13 +14,27 @@ class Genre(SQLAlchemyObjectType):
 
 class Query(graphene.ObjectType):
     movies = graphene.List(Movie)
+    genres = graphene.List(Genre)
+
+    get_movies_by_genre = graphene.List(Movie, genre_id=graphene.Int(required=True))
+    
+    get_genre_by_movie = graphene.List(Genre, movie_id=graphene.Int(required=True))
 
     def resolve_movies(self, info):
-        return db.session.execute(db.select(MovieModel)).scalars()
+        return db.session.execute(db.select(MovieModel)).scalars().all()
     
     def resolve_genres(self, info):
-        query = Genre.get_query(info)
-        return query.filter(GenreModel.movies.any(id=self.id)).all()
+        return db.session.execute(db.select(GenreModel)).scalars().all()
+
+    def resolve_get_movies_by_genre(self, info, genre_id):
+        return db.session.execute(db.select(MovieModel).filter(MovieModel.genre == genre_id)).scalars().all()
+    
+    def resolve_get_genre_by_movie(self, info, movie_id):
+        genre_id = db.session.execute(db.select(MovieModel.genre).filter(MovieModel.id == movie_id)).scalar_one_or_none()
+        
+        if genre_id:
+            return db.session.execute(db.select(GenreModel).filter(GenreModel.id == genre_id)).scalars().all()
+        return []
     
 class AddMovie(graphene.Mutation):
     class Arguments:
@@ -133,6 +147,7 @@ class DeleteGenre(graphene.Mutation):
                     return None
             session.refresh(genre)
             return DeleteGenre(genre=genre)
+        
 
 class Mutation(graphene.ObjectType):
     create_movie = AddMovie.Field()
